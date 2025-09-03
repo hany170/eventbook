@@ -4,6 +4,9 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 const updateEventSchema = z.object({
   title: z.string().min(1, "Title is required").optional(),
   description: z.string().optional(),
@@ -24,6 +27,14 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Check if we're in build mode
+    if (process.env.NODE_ENV === 'production' && !process.env.MONGODB_URI) {
+      return NextResponse.json(
+        { error: "Database not configured" },
+        { status: 503 }
+      );
+    }
+
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json(

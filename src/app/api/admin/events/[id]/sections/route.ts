@@ -4,6 +4,9 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 const sectionSchema = z.object({
   name: z.string().min(1, "Section name is required"),
   rows: z.number().min(1, "Rows must be at least 1"),
