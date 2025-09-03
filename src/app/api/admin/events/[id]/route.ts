@@ -21,7 +21,7 @@ const updateEventSchema = z.object({
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -40,21 +40,23 @@ export async function PATCH(
       );
     }
 
+    const { id } = await params;
     const body = await request.json();
     const updateData = updateEventSchema.parse(body);
 
     // Convert date strings to Date objects if provided
+    const processedData: any = { ...updateData };
     if (updateData.startAt) {
-      updateData.startAt = new Date(updateData.startAt);
+      processedData.startAt = new Date(updateData.startAt);
     }
     if (updateData.endAt) {
-      updateData.endAt = new Date(updateData.endAt);
+      processedData.endAt = new Date(updateData.endAt);
     }
 
     // Update event
     const event = await prisma.event.update({
-      where: { id: params.id },
-      data: updateData
+      where: { id },
+      data: processedData
     });
 
     return NextResponse.json({

@@ -19,7 +19,7 @@ const createSectionsSchema = z.object({
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -38,9 +38,10 @@ export async function POST(
       );
     }
 
+    const { id } = await params;
     // Check if event exists and belongs to the admin
     const event = await prisma.event.findUnique({
-      where: { id: params.id }
+      where: { id }
     });
 
     if (!event) {
@@ -62,7 +63,7 @@ export async function POST(
 
     // Delete existing seats for this event
     await prisma.seat.deleteMany({
-      where: { eventId: params.id }
+      where: { eventId: id }
     });
 
     // Create new seats
@@ -75,11 +76,11 @@ export async function POST(
           const label = `${rowLabel}${colLabel}`;
           
           seats.push({
-            eventId: params.id,
+            eventId: id,
             label,
             section: section.name,
             priceCents: section.priceAdjCents,
-            status: "AVAILABLE"
+            status: "AVAILABLE" as const
           });
         }
       }

@@ -3,11 +3,12 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const event = await prisma.event.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         organizer: {
           select: {
@@ -46,7 +47,7 @@ export async function GET(
     // Calculate available GA tickets
     const soldTickets = await prisma.ticket.count({
       where: {
-        eventId: params.id,
+        eventId: id,
         seatId: null // GA tickets don't have seats
       }
     });
