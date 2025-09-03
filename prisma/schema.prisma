@@ -1,0 +1,174 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("MONGODB_URI")
+}
+
+enum Role {
+  USER
+  ORGANIZER
+  ADMIN
+  VALIDATOR
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum SeatStatus {
+  AVAILABLE
+  LOCKED
+  SOLD
+}
+
+model User {
+  id              String     @id @default(auto()) @map("_id") @db.ObjectId
+  name            String?
+  email           String?    @unique
+  password        String?
+  emailVerified   DateTime?
+  image           String?
+  role            Role       @default(USER)
+  accounts        Account[]
+  sessions        Session[]
+  orders          Order[]
+  tickets         Ticket[]   @relation("TicketOwner")
+  organizedEvents Event[]    @relation("Organizer")
+  seatLocks       SeatLock[] @relation("SeatLockUser")
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+model Account {
+  id                String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String  @db.ObjectId
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  sessionToken String   @unique
+  userId       String   @db.ObjectId
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@index([identifier])
+}
+
+model Event {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  organizerId   String   @db.ObjectId
+  organizer     User     @relation("Organizer", fields: [organizerId], references: [id])
+  slug          String   @unique
+  title         String
+  description   String?
+  category      String?
+  startAt       DateTime
+  endAt         DateTime
+  venueName     String?
+  venueCity     String?
+  coverImageUrl String?
+  currencyCode  String   @default("USD")
+  priceCents    Int
+  capacity      Int
+  published     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  orders  Order[]
+  tickets Ticket[]
+  seats   Seat[]
+
+  @@index([startAt, category])
+}
+
+model Order {
+  id                    String      @id @default(auto()) @map("_id") @db.ObjectId
+  userId                String      @db.ObjectId
+  eventId               String      @db.ObjectId
+  qty                   Int
+  stripePaymentIntentId String?
+  amountTotalCents      Int
+  status                OrderStatus @default(PENDING)
+  createdAt             DateTime    @default(now())
+
+  user    User     @relation(fields: [userId], references: [id])
+  event   Event    @relation(fields: [eventId], references: [id])
+  tickets Ticket[]
+
+  @@index([userId, createdAt])
+}
+
+model Ticket {
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  orderId          String    @db.ObjectId
+  eventId          String    @db.ObjectId
+  ownerId          String    @db.ObjectId
+  serialNo         String    @unique
+  qrJws            String
+  barcodeDataUrl   String?
+  code             String    @unique
+  seatId           String?   @db.ObjectId
+  issuedAt         DateTime  @default(now())
+  validatedAt      DateTime?
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  owner User  @relation("TicketOwner", fields: [ownerId], references: [id])
+  seat  Seat? @relation(fields: [seatId], references: [id])
+
+  @@index([eventId, ownerId])
+}
+
+model Seat {
+  id         String     @id @default(auto()) @map("_id") @db.ObjectId
+  eventId    String     @db.ObjectId
+  label      String
+  section    String?
+  priceCents Int?
+  status     SeatStatus @default(AVAILABLE)
+
+  event   Event      @relation(fields: [eventId], references: [id])
+  tickets Ticket[]
+  locks   SeatLock[]
+
+  @@unique([eventId, label])
+  @@index([eventId])
+}
+
+model SeatLock {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  seatId    String   @unique @db.ObjectId
+  userId    String   @db.ObjectId
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  seat Seat @relation(fields: [seatId], references: [id], onDelete: Cascade)
+  user User @relation("SeatLockUser", fields: [userId], references: [id])
+
+  @@index([expiresAt])
+}
